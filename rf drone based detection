@@ -1,0 +1,128 @@
+#include <ESP8266WiFi.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+
+#define BUZZER_PIN 16   // D0
+#define LED_PIN     2   // D4
+
+
+void setup() {
+
+  Serial.begin(115200);
+  delay(1000);
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(LED_PIN, LOW);
+
+  
+  Wire.begin(4,5);   // SDA=D2, SCL=D1
+  Wire.setClock(400000);
+
+  
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED NOT FOUND");
+    while(1);
+  }
+
+  display.setTextColor(SSD1306_WHITE);
+
+  /* WiFi Setup */
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  showOLED("SYSTEM READY", "Scanning...");
+}
+
+/* ================= LOOP ================= */
+void loop() {
+
+  int n = WiFi.scanNetworks();
+
+  if (n > 0) {
+
+    int strongest = 0;
+
+    for (int i = 0; i < n; i++) {
+      if (WiFi.RSSI(i) > WiFi.RSSI(strongest)) {
+        strongest = i;
+      }
+    }
+
+    String ssid = WiFi.SSID(strongest);
+    int rssi = WiFi.RSSI(strongest);
+    String mac = WiFi.BSSIDstr(strongest);
+
+    float distance = pow(10, ((-40 - rssi) / 20.0));
+
+    /* ===== SERIAL OUTPUT ===== */
+    Serial.println("----------------------------");
+    Serial.print("WiFi Name : "); Serial.println(ssid);
+    Serial.print("RSSI      : "); Serial.println(rssi);
+    Serial.print("MAC Addr  : "); Serial.println(mac);
+    Serial.print("Distance  : "); Serial.print(distance,1); Serial.println(" m");
+
+    /* ===== ALERT ===== */
+    digitalWrite(BUZZER_PIN, HIGH);
+    digitalWrite(LED_PIN, HIGH);
+
+    /* ===== OLED DISPLAY ===== */
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setTextSize(1);
+
+    display.setCursor(0,0);
+    display.print("SSID:");
+    display.println(ssid);
+
+    display.setCursor(0,12);
+    display.print("RSSI:");
+    display.println(rssi);
+
+    display.setCursor(0,24);
+    display.print("MAC:");
+    display.println(mac.substring(0,12));  // shorten for display
+
+    display.setCursor(0,36);
+    display.print("Dist:");
+    display.print(distance,1);
+    display.println("m");
+
+    display.display();
+
+  } else {
+
+    Serial.println("No WiFi Found");
+
+    digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
+
+    showOLED("AREA CLEAR", "");
+  }
+
+  delay(4000);
+}
+ 
+void showOLED(String l1, String l2) {
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setTextSize(1);
+  display.setCursor(0,10);
+  display.println(l1);
+
+  display.setTextSize(2);
+  display.setCursor(0,30);
+  display.println(l2);
+
+  display.display();
+}
